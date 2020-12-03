@@ -20,18 +20,30 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
 
+from env import config
+
 
 #%% DB 커넥션
-
+# TODO: db_conn 을 이용해서 저장할 것
 conn = pymongo.MongoClient(host='218.232.111.79', port=27017, unicode_decode_error_handler='ignore')
 
 db = conn['jejusc'] #데이터 베이스
 
-collectionList = ["jejusc_review_202007","jejusc_document_202007", 
+collectionList = ["jejusc_review_202007","jejusc_document_202007",
               "jejusc_review_202008","jejusc_document_202008",                  
               "jejusc_review_202009","jejusc_document_202009",
               "jejusc_review_202010","jejusc_document_202010",
               "jejusc_review_202011","jejusc_document_202011"]              
+
+
+# my 코드
+params = config.mongo_config()
+collection_name = params['collection']
+doc_type = 0
+if "review" in collection_name:
+    doc_type = 1
+elif "document" in collection_name:
+    doc_type = 2
 
 
 # 함수: DB 세팅 - DB별 세팅
@@ -141,10 +153,10 @@ ca_d3 = "감성"
 #%% 실행: 사전 단어 1
 stime = time.time()   # 시작시간
 print(ca_d1,"사전을 로딩 중입니다. 기다려주세요")
-path = 'C:/Users/user/.spyder-py3/e2on/p_sosang/uninan.xlsx'   
-d1_df = pd.read_excel(path,header=0)
-d1_df.drop_duplicates(['단어'],keep='last',inplace=True)
-d1_df.reset_index(drop=True,inplace=True)
+path = './uninan.xlsx'
+d1_df = pd.read_excel(path, header=0)
+d1_df.drop_duplicates(['단어'], keep='last',inplace=True)
+d1_df.reset_index(drop=True, inplace=True)
 d1_df.to_csv('./d1_df.csv')
 etime = time.time()   # 종료시간
 print("# 소요시간 : ", str(datetime.timedelta(seconds=etime-stime)))    
@@ -207,11 +219,10 @@ from konlpy.tag import Okt
 # 형태소분석기
 pos_tagger = Okt()
 
-def tokenize(db_number, doc_type, max_words):  # max_words = 30 (리뷰)/ 300 (문서)   # 문서 500단어 결과값이 안나와서 300으로 줄임   
+def tokenize(db_number, doc_type, max_words):  # max_words = 30 (리뷰)/ 300 (문서)   # 문서 500단어 결과값이 안나와서 300으로 줄임
     db_name = collectionList[db_number]
 
-
-# 라인별로 읽기   
+    # 라인별로 읽기
     for n in range(len(content_df)):  
     #for n in range(10):        #테스트
         print(db_name,"형태소 분석 - 문서:",n) # DB명        
@@ -231,9 +242,10 @@ def tokenize(db_number, doc_type, max_words):  # max_words = 30 (리뷰)/ 300 (�
         token_df['tokens'][n] = ['/'.join(t) for t in pos_tagger.pos(content, norm=True, stem=True)]
         temp_list = [re.sub('[\a-zA-Z]+', '', t) for t in token_df['tokens'][n]]
         #temp_list = [re.sub('[^가-힣]+','',item) for item in temp_list]    # 뭔가 이상함. 추후 체크 !!!!!!!!!!!!!!!
-        token_df['token_words'][n] = list(filter(None,temp_list))
+        token_df['token_words'][n] = list(filter(None, temp_list))
         if doc_type == 1:
-            token_df['train_tokens'][n] = [(token_df['tokens'][n],token_df['point'][n]>=3 and 'pos' or 'neg')]    # 문서는 결과값 없으므로 미사용
+            token_df['train_tokens'][n] = [(token_df['tokens'][n],
+                                            token_df['point'][n]>=3 and 'pos' or 'neg')]    # 문서는 결과값 없으므로 미사용
         elif doc_type == 2:
             pass
         else: 
@@ -245,13 +257,15 @@ def token_exists(doc,n):
     return {word: (word in set(doc)) for word in tokens}
 
 def train_xy(n):
-    train_xy = [(token_exists(doc,n),c) for doc,c in token_df['train_tokens'][n]]
+    train_xy = [(token_exists(doc, n), c) for doc, c in token_df['train_tokens'][n]]
     print(train_xy)
     return train_xy
 
 #실행: 형태소 분석
+stime = time.time()  # 시작시간
 tokenize(db_number=db_number, doc_type=doc_type, max_words=max_words)  
-
+etime = time.time()  # 종료시간
+print("# 소요시간 : ", str(datetime.timedelta(seconds=etime - stime)))
 
 #%% 함수: 사전별 검출단어 분석
 
@@ -605,6 +619,7 @@ db.컬렉션명.update({_id: ObjectId('24자리키')}, {$set: {sentimented: 1, .
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 
+# TODO: svae 를 n번 반복해서 update 하고 있다. 이를 bulk_update로 변경필요
 def save():
     for n in range(len(token_df)):  
     #for n in range(10):        #테스트   
@@ -630,57 +645,57 @@ save()
 
 #%% (임시) 백업
 #리뷰
-content_df.to_csv('./content_rev7월_df.csv')
-content_df.loc[:120,].to_excel('./content_rev7월_df_120개.xlsx') #테스트 자료
-token_df.to_csv('./token_rev7월_df.csv')
-token_df.loc[:120,].to_excel('./token_rev7월_df_120개.xlsx') #테스트 자료
-
-content_df.to_csv('./content_rev8월_df.csv')
-token_df.to_csv('./token_rev8월_df.csv')
-
-content_df.to_csv('./content_rev9월_df.csv')
-token_df.to_csv('./token_rev9월_df.csv')
-
-#문서
-content_df.to_csv('./content_doc7월_df.csv')
-content_df.loc[:130,].to_excel('./content_doc7월_df_120개.xlsx') #테스트 자료
-token_df.to_csv('./token_doc7월_df.csv')
-token_df.loc[:130,].to_excel('./token_doc7월_df_120개.xlsx') #테스트 자료
-
-content_df.to_csv('./content_doc8월_df.csv')
-token_df.to_csv('./token_doc8월_df.csv')
-
-content_df.to_csv('./content_doc9월_df.csv')
-token_df.to_csv('./token_doc9월_df.csv')
-
-content_df.to_csv('./content_doc10월_df.csv')
-token_df.to_csv('./token_doc10월_df.csv')
-
-content_df.to_csv('./content_doc10월_df.csv')
-token_df.to_csv('./token_doc10월_df.csv')
-
-#%% (임시) 로딩
-#리뷰
-content_df = pd.read_csv('./content_rev7월_df.csv')
-token_df = pd.read_csv('./token_rev7월_df.csv')
-
-content_df = pd.read_csv('./content_rev8월_df.csv')
-token_df = pd.read_csv('./token_rev8월_df.csv')
-
-content_df = pd.read_csv('./content_rev9월_df.csv')
-token_df = pd.read_csv('./token_rev9월_df.csv')
-
-#문서
-content_df = pd.read_csv('./content_doc7월_df.csv')
-token_df = pd.read_csv('./token_doc7월_df.csv')
-
-content_df = pd.read_csv('./content_doc8월_df.csv')
-token_df = pd.read_csv('./token_doc8월_df.csv')
-
-content_df = pd.read_csv('./content_doc9월_df.csv')
-token_df = pd.read_csv('./token_doc9월_df.csv')
-
-
-d1_df = pd.read_csv('./d1_df.csv')
-d2_df = pd.read_csv('./d2_df.csv')
-d3_df = pd.read_csv('./d3_df.csv')
+# content_df.to_csv('./content_rev7월_df.csv')
+# content_df.loc[:120,].to_excel('./content_rev7월_df_120개.xlsx') #테스트 자료
+# token_df.to_csv('./token_rev7월_df.csv')
+# token_df.loc[:120,].to_excel('./token_rev7월_df_120개.xlsx') #테스트 자료
+#
+# content_df.to_csv('./content_rev8월_df.csv')
+# token_df.to_csv('./token_rev8월_df.csv')
+#
+# content_df.to_csv('./content_rev9월_df.csv')
+# token_df.to_csv('./token_rev9월_df.csv')
+#
+# #문서
+# content_df.to_csv('./content_doc7월_df.csv')
+# content_df.loc[:130,].to_excel('./content_doc7월_df_120개.xlsx') #테스트 자료
+# token_df.to_csv('./token_doc7월_df.csv')
+# token_df.loc[:130,].to_excel('./token_doc7월_df_120개.xlsx') #테스트 자료
+#
+# content_df.to_csv('./content_doc8월_df.csv')
+# token_df.to_csv('./token_doc8월_df.csv')
+#
+# content_df.to_csv('./content_doc9월_df.csv')
+# token_df.to_csv('./token_doc9월_df.csv')
+#
+# content_df.to_csv('./content_doc10월_df.csv')
+# token_df.to_csv('./token_doc10월_df.csv')
+#
+# content_df.to_csv('./content_doc10월_df.csv')
+# token_df.to_csv('./token_doc10월_df.csv')
+#
+# #%% (임시) 로딩
+# #리뷰
+# content_df = pd.read_csv('./content_rev7월_df.csv')
+# token_df = pd.read_csv('./token_rev7월_df.csv')
+#
+# content_df = pd.read_csv('./content_rev8월_df.csv')
+# token_df = pd.read_csv('./token_rev8월_df.csv')
+#
+# content_df = pd.read_csv('./content_rev9월_df.csv')
+# token_df = pd.read_csv('./token_rev9월_df.csv')
+#
+# #문서
+# content_df = pd.read_csv('./content_doc7월_df.csv')
+# token_df = pd.read_csv('./token_doc7월_df.csv')
+#
+# content_df = pd.read_csv('./content_doc8월_df.csv')
+# token_df = pd.read_csv('./token_doc8월_df.csv')
+#
+# content_df = pd.read_csv('./content_doc9월_df.csv')
+# token_df = pd.read_csv('./token_doc9월_df.csv')
+#
+#
+# d1_df = pd.read_csv('./d1_df.csv')
+# d2_df = pd.read_csv('./d2_df.csv')
+# d3_df = pd.read_csv('./d3_df.csv')
