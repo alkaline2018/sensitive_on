@@ -140,6 +140,7 @@ print(CA_D2, "사전을 로딩 중입니다. 기다려주세요")
 d2_df = pd.DataFrame(columns=['단어', '점수'])
 P1 = re.compile("[가-힣]+")
 P2 = re.compile("([가-힣]+)[ ]+[가-힣]+[가-힣 ]*")
+#
 KUN_DICT_PATH = './KnuSentiLex-master/SentiWord_Dict.txt'
 with open('./KnuSentiLex-master/data/SentiWord_info.json', encoding='utf-8-sig', mode='r') as f:
     data = json.load(f)  # 리스트내 집합
