@@ -196,6 +196,8 @@ pos_tagger = Okt()
 
 def tokenize(_collection_name, _doc_type, _max_words):  # max_words = 30 (리뷰)/ 300 (문서)   # 문서 500단어 결과값이 안나와서 300으로 줄임
     # 라인별로 읽기
+    # TODO: 해당 내용을 apply 로 적용
+    # token_df['tokens'][n] = ['/'.join(t) for t in pos_tagger.pos(content, norm=True, stem=True)]
     for n in range(len(content_df)):
         # for n in range(10):        #테스트
         print(_collection_name, "형태소 분석 - 문서:", n)  # DB명
@@ -212,7 +214,8 @@ def tokenize(_collection_name, _doc_type, _max_words):  # max_words = 30 (리뷰
             content = ' '.join(word_list[0:_max_words])
             # word_list = content.split(' ') #30단어로 줄인 단어리스트
         # token_df['word_list'][n] = word_list  # 원하는 단어가 아님
-        token_df['tokens'][n] = ['/'.join(t) for t in pos_tagger.pos(content, norm=True, stem=True)]
+        # 아랫 내용을 for 문 밖으로 뺀다.
+        # token_df['tokens'][n] = ['/'.join(t) for t in pos_tagger.pos(content, norm=True, stem=True)]
         temp_list = [re.sub('[\a-zA-Z]+', '', t) for t in token_df['tokens'][n]]
         # temp_list = [re.sub('[^가-힣]+','',item) for item in temp_list]    # 뭔가 이상함. 추후 체크 !!!!!!!!!!!!!!!
         token_df['token_words'][n] = list(filter(None, temp_list))
@@ -265,7 +268,7 @@ print("# 소요시간 : ", str(datetime.timedelta(seconds=etime - stime)))
 #                                   _max_words=max_words, _doc_type=doc_type))
 
 # %% 함수: 사전별 검출단어 분석
-
+# TODO: 속도 업  해야함 그리고 똑같은 for문 줄이기
 def token_dic(_dic_num):
     ################################## 사전단어 보유여부 체크 (tokens에서 검색)        
     for n in range(len(token_df)):
@@ -275,7 +278,9 @@ def token_dic(_dic_num):
 
         # 각 문서별 단어 통계
         tokens = []
-        token_words = token_df.loc[n, 'token_words']  # 형태소분석된 tokens_words 기준 검색 예정
+        # token_words = token_df.loc[n, 'token_words']  # 형태소분석된 tokens_words 기준 검색 예정
+        token_words_set = set(token_df['token_words'][n])
+
 
         if _dic_num == 1:
             token_df['d1_tokens'][n] = ''  # 사전별 단어 초기화 (기존에 단어가 있을 경우 오류발생 가능성 차단)
@@ -286,32 +291,33 @@ def token_dic(_dic_num):
         else:
             print("함수호출 에러입니다.")
             break
+        #
+        # for j, word2 in enumerate(d1_df['단어']):  # 사전단어 찾기
+        #     if word2 in token_words_set:
 
+        # for i, word1 in enumerate(token_words):  # token_words 회전
+        if _dic_num == 1:
+            # tokens = [m.group() for m in re.finditer(word1, content_df.loc[n,'content'])]  #content에서 검색
+            for j, word2 in enumerate(d1_df['단어']):  # 사전 회전
+                if word2 in token_words_set:
+                    tokens.append(word2)
+            token_df['d1_tokens'][n] = tokens
 
-        for i, word1 in enumerate(token_words):  # token_words 회전
-            if _dic_num == 1:
-                # tokens = [m.group() for m in re.finditer(word1, content_df.loc[n,'content'])]  #content에서 검색
-                for j, word2 in enumerate(d1_df['단어']):  # 사전 회전
-                    if word1 == word2:
-                        tokens.append(word1)
-                token_df['d1_tokens'][n] = tokens
+        elif _dic_num == 2:
+            for j, word2 in enumerate(d2_df['단어']):  # 사전 회전
+                if word2 in token_words_set:
+                    tokens.append(word2)
+            token_df['d2_tokens'][n] = tokens
 
-            elif _dic_num == 2:
-                for j, word2 in enumerate(d2_df['단어']):  # 사전 회전
-                    if word1 == word2:
-                        tokens.append(word1)
-                token_df['d2_tokens'][n] = tokens
+        elif _dic_num == 3:
+            for j, word2 in enumerate(d3_df['단어']):  # 사전 회전
+                if word2 in token_words_set:
+                    tokens.append(word2)
+            token_df['d3_tokens'][n] = tokens
 
-            elif _dic_num == 3:
-                for j, word2 in enumerate(d3_df['단어']):  # 사전 회전
-                    if word1 == word2:
-                        tokens.append(word1)
-                token_df['d3_tokens'][n] = tokens
-
-            else:
-                print("함수호출 에러입니다.")
-                break
-
+        else:
+            print("함수호출 에러입니다.")
+            break
 
 # 실행: 사전별 검출단어 분석
 token_dic(_dic_num=1)
@@ -341,26 +347,25 @@ def point_dic(_dic_num):
         else:
             print("함수호출 에러입니다.")
             break
+        token_words_set = set(token_list)
+        for j, word2 in enumerate(dictionary):  # 사전단어 찾기
+            if word2 in token_words_set:
+                if _dic_num == 1:
+                    score = int(d1_df['점수'][j])
+                elif _dic_num == 2:
+                    score = int(d2_df['점수'][j])
+                else:
+                    score = int(d3_df['점수'][j])
 
-        for i, word1 in enumerate(token_list):
-            for j, word2 in enumerate(dictionary):  # 사전단어 찾기
-                if word1 == word2:
-                    if _dic_num == 1:
-                        score = int(d1_df['점수'][j])
-                    elif _dic_num == 2:
-                        score = int(d2_df['점수'][j])
-                    else:
-                        score = int(d3_df['점수'][j])
-
-                    if score > 0:
-                        print("긍정", score)
-                        positive += score
-                    elif score < 0:
-                        print("부정", score)
-                        negative += score
-                    else:
-                        pass
-                    break
+                if score > 0:
+                    print("긍정", score)
+                    positive += score
+                elif score < 0:
+                    print("부정", score)
+                    negative += score
+                else:
+                    pass
+                break
         if _dic_num == 1:
             token_df['p1'][n] = positive
             token_df['n1'][n] = negative
@@ -573,33 +578,33 @@ def word_reference():
         print("긍정부정:", n)
         p_words = []
         n_words = []
-        token_list = list(set(token_df['temp'][n]))
+        # token_list = list(set(token_df['temp'][n]))
+        token_set = set(token_df['temp'][n])
 
-        for i, word1 in enumerate(token_list):
-            for j, word2 in enumerate(d1_df['단어']):  # 사전단어 찾기
-                if word1 == word2:
-                    score = int(d1_df['점수'][j])
-                    if score > 0:
-                        p_words.append(d1_df['단어'][j])
-                    elif score < 0:
-                        n_words.append(d1_df['단어'][j])
-                    break
-            for j, word2 in enumerate(d2_df['단어']):  # 사전단어 찾기
-                if word1 == word2:
-                    score = int(d2_df['점수'][j])
-                    if score > 0:
-                        p_words.append(d2_df['단어'][j])
-                    elif score < 0:
-                        n_words.append(d2_df['단어'][j])
-                    break
-            for j, word2 in enumerate(d3_df['단어']):  # 사전단어 찾기
-                if word1 == word2:
-                    score = int(d3_df['점수'][j])
-                    if score > 0:
-                        p_words.append(d3_df['단어'][j])
-                    elif score < 0:
-                        n_words.append(d3_df['단어'][j])
-                    break
+        for j, word2 in enumerate(d1_df['단어']):  # 사전단어 찾기
+            if word2 in token_set:
+                score = int(d1_df['점수'][j])
+                if score > 0:
+                    p_words.append(d1_df['단어'][j])
+                elif score < 0:
+                    n_words.append(d1_df['단어'][j])
+                break
+        for j, word2 in enumerate(d2_df['단어']):  # 사전단어 찾기
+            if word2 in token_set:
+                score = int(d2_df['점수'][j])
+                if score > 0:
+                    p_words.append(d2_df['단어'][j])
+                elif score < 0:
+                    n_words.append(d2_df['단어'][j])
+                break
+        for j, word2 in enumerate(d3_df['단어']):  # 사전단어 찾기
+            if word2 in token_set:
+                score = int(d3_df['점수'][j])
+                if score > 0:
+                    p_words.append(d3_df['단어'][j])
+                elif score < 0:
+                    n_words.append(d3_df['단어'][j])
+                break
 
         p_words = list(set(p_words))
         n_words = list(set(n_words))
